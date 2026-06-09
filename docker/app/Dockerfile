@@ -22,6 +22,10 @@ RUN sed -i 's|https://gitpkg.now.sh/Prometheus-X-association/contract-consent-ag
 
 RUN rm -f pnpm-lock.yaml && npm install --legacy-peer-deps --ignore-scripts
 
+# Rebuild native addons (bcrypt compiles a .node binary tied to the Node ABI version;
+# --ignore-scripts skipped its postinstall, so we rebuild explicitly)
+RUN npm rebuild
+
 # Generate crypto keys used for consent signatures
 RUN mkdir -p src/config/keys \
     && openssl genrsa -out src/config/keys/consentSignature.pem 2048 \
@@ -33,7 +37,9 @@ COPY . .
 
 RUN chown -R node:node /usr/src/app
 
-# Build (postbuild automatically runs copyKeys)
-RUN npm run build || true
+# Build — run tsc and postbuild (copyKeys) separately from any alias step
+RUN npx rimraf dist/ || true
+RUN npx tsc || true
+RUN npm run copyKeys || true
 
 CMD ["node", "dist/src/index.js"]
